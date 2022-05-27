@@ -1,11 +1,12 @@
 import requests
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 
 def api_response(token_addresses):
     responses = {}
-    for i in range(0, len(token_addresses)):
+    for i in range(0, tqdm(len(token_addresses))):
         r = requests.get("https://api.dexscreener.com/latest/dex/tokens/{}".format(token_addresses[i]))
         try:
             responses[i] = r.json()

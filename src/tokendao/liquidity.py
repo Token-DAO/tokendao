@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 def api_response(token_addresses):
     responses = {}
-    for i in range(0, tqdm(len(token_addresses))):
+    for i in tqdm(range(0, len(token_addresses))):
         r = requests.get("https://api.dexscreener.com/latest/dex/tokens/{}".format(token_addresses[i]))
         try:
             responses[i] = r.json()
@@ -41,7 +41,7 @@ def get_liquidity(responses, address_num):
 def compile_liquidity(token_addresses, responses):
     symbols = []
     liquidity = {}
-    for address_num in range(0, len(token_addresses)):
+    for address_num in tqdm(range(0, len(token_addresses))):
         try:
             symbols.append(responses[address_num]["pairs"][0]["baseToken"]["symbol"])
         except IndexError:

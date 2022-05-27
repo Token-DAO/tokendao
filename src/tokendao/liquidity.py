@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 def api_response(token_addresses):
     responses = {}
-    for i in tqdm(range(len(token_addresses))):
+    for i in range(len(token_addresses)):
         r = requests.get("https://api.dexscreener.com/latest/dex/tokens/{}".format(token_addresses[i]))
         try:
             responses[i] = r.json()

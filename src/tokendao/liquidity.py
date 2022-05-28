@@ -29,11 +29,11 @@ def api_response(token_addresses):
     return d
 
 
-def get_liquidity(data, token_address):
+def get_liquidity(responses, token_address):
     """Get liquidity data from dictionary containing data.
 
     Args:
-        data (dict): Dictionary containing data.
+        responses (dict): Dictionary containing data.
         token_address (str): Token contract address.
 
     Returns:
@@ -42,10 +42,10 @@ def get_liquidity(data, token_address):
     """
     dex = {}
     liq = {}
-    for i in range(0, len(data[token_address]["pairs"])):
+    for i in range(0, len(responses[token_address]["pairs"])):
         try:
-            liq[i] = data[token_address]["pairs"][i]["liquidity"]["usd"]
-            dex[i] = data[token_address]["pairs"][i]["dexId"]
+            liq[i] = responses[token_address]["pairs"][i]["liquidity"]["usd"]
+            dex[i] = responses[token_address]["pairs"][i]["dexId"]
         except KeyError:
             continue
     df = pd.DataFrame({

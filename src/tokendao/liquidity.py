@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+"""API client for obtaining liquidity data."""
+
 import requests
 import pandas as pd
 import numpy as np
@@ -5,25 +8,44 @@ from tqdm import tqdm
 
 
 def api_response(token_addresses):
-    responses = {}
+    """Get token metadata from dexscreener API.
+
+    Args:
+        token_addresses (list): List of token addresses.
+
+    Returns:
+        dict: dictionary containing data.
+
+    """
+    d = {}
     for i in range(len(token_addresses)):
         r = requests.get("https://api.dexscreener.com/latest/dex/tokens/{}".format(token_addresses[i]))
         try:
-            responses[i] = r.json()
+            d[i] = r.json()
             print("Status: {}".format(r.status_code))
         except ValueError:
             print("Token address returned no data: {}".format(token_addresses[i]))
             continue
-    return responses
+    return d
 
 
-def get_liquidity(responses, address_num):
+def get_liquidity(data, token_address):
+    """Get liquidity data from dictionary containing data.
+
+    Args:
+        data (dict): Dictionary containing data.
+        token_address (str): Token contract address.
+
+    Returns:
+        DataFrame: DataFrame of liquidity data for token address.
+
+    """
     dex = {}
     liq = {}
-    for i in range(0, len(responses[address_num]["pairs"])):
+    for i in range(0, len(data[token_address]["pairs"])):
         try:
-            liq[i] = responses[address_num]["pairs"][i]["liquidity"]["usd"]
-            dex[i] = responses[address_num]["pairs"][i]["dexId"]
+            liq[i] = data[token_address]["pairs"][i]["liquidity"]["usd"]
+            dex[i] = data[token_address]["pairs"][i]["dexId"]
         except KeyError:
             continue
     df = pd.DataFrame({
@@ -38,17 +60,27 @@ def get_liquidity(responses, address_num):
     }, index=[0])
 
 
-def compile_liquidity(token_addresses, responses):
+def compile_liquidity(token_addresses, data):
+    """Combines liquidity data into single DataFrame.
+
+    Args:
+        token_addresses (list): List of token addresses.
+        data (dict): Dictionary containing data.
+
+    Returns:
+        DataFrame: DataFrame of liquidity data for token address.
+
+    """
     symbols = []
     liquidity = {}
-    for address_num in tqdm(range(len(token_addresses))):
+    for token_address in tqdm(range(len(token_addresses))):
         try:
-            symbols.append(responses[address_num]["pairs"][0]["baseToken"]["symbol"])
+            symbols.append(data[token_address]["pairs"][0]["baseToken"]["symbol"])
         except IndexError:
-            print("This address is invalid or has no liquidity: {}".format(token_addresses[address_num]))
+            print("This address is invalid or has no liquidity: {}".format(token_addresses[token_address]))
             continue
         try:
-            liquidity[responses[address_num]["pairs"][0]["baseToken"]["symbol"]] = get_liquidity(responses, address_num)
+            liquidity[data[token_address]["pairs"][0]["baseToken"]["symbol"]] = get_liquidity(data, token_address)
         except KeyError:
             continue
     df = pd.concat(liquidity).reset_index().rename(columns={"level_0": "Symbol"}).drop(["level_1"], axis=1).set_index(

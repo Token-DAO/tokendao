@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 
 def api_response(token_addresses):
-    """Get token metadata from dexscreener API.
+    """Get token data from dexscreener API.
 
     Args:
         token_addresses (list): List of token addresses.

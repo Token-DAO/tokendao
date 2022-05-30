@@ -22,7 +22,10 @@ def api_response(token_addresses):
         r = requests.get("https://api.dexscreener.com/latest/dex/tokens/{}".format(token_addresses[i]))
         try:
             d[i] = r.json()
-            print("Status: {}".format(r.status_code))
+            if r.status_code == 200:
+                print("Server Status: {} OK".format(r.status_code))
+            else:
+                print("Server Error: {}".format(r.status_code))
         except ValueError:
             print("Token address returned no data: {}".format(token_addresses[i]))
             continue
@@ -60,12 +63,12 @@ def get_liquidity(responses, token_address):
     }, index=[0])
 
 
-def compile_liquidity(token_addresses, data):
+def compile_liquidity(token_addresses, responses):
     """Combines liquidity data into single DataFrame.
 
     Args:
         token_addresses (list): List of token addresses.
-        data (dict): Dictionary containing data.
+        responses (dict): Dictionary containing data.
 
     Returns:
         DataFrame: DataFrame of liquidity data for token address.
@@ -73,14 +76,14 @@ def compile_liquidity(token_addresses, data):
     """
     symbols = []
     liquidity = {}
-    for token_address in tqdm(range(len(token_addresses))):
+    for i in tqdm(range(len(token_addresses))):
         try:
-            symbols.append(data[token_address]["pairs"][0]["baseToken"]["symbol"])
+            symbols.append(responses[i]["pairs"][0]["baseToken"]["symbol"])
         except IndexError:
-            print("This address is invalid or has no liquidity: {}".format(token_addresses[token_address]))
+            print("This address is invalid or has no liquidity: {}".format(token_addresses[i]))
             continue
         try:
-            liquidity[data[token_address]["pairs"][0]["baseToken"]["symbol"]] = get_liquidity(data, token_address)
+            liquidity[responses[i]["pairs"][0]["baseToken"]["symbol"]] = get_liquidity(responses, i)
         except KeyError:
             continue
     df = pd.concat(liquidity).reset_index().rename(columns={"level_0": "Symbol"}).drop(["level_1"], axis=1).set_index(

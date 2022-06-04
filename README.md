@@ -2,7 +2,7 @@
 # tokendao
 tokendao is the official Python client of the TokenDAO. The client provides functions for obtaining, processing, and analysis of cryptocurrency data. 
 
-This documentation will provide the basic steps to start using tokendao’s python library.
+This documentation will provide the basic steps to start using tokendao’s Python library.
 
 ## Remote Install
 To install the tokendao package remotely:

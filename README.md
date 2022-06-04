@@ -22,4 +22,4 @@ tokendao$> python setup.py install
 ```
 
 ## Quickstart
-Examples can be found in [this](https://colab.research.google.com/drive/12r-b8K5wR5_yVkI6-UyD7KBSN51OsV6g?authuser=4#scrollTo=vAaZ-h1ox3NS) Jupyter Notebook. 
+Examples can be found in [this](https://colab.research.google.com/drive/12r-b8K5wR5_yVkI6-UyD7KBSN51OsV6g?usp=sharing) Jupyter Notebook. 

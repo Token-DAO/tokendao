@@ -234,6 +234,7 @@ def eff_frontier_plot(covariance_matrix, exp_returns, results, figsize=(12, 6)):
     max_sharpe_ratio_index = sharpe_ratios.index(max(sharpe_ratios))
     min_volatility_index = portfolio_volatilities.index(min(portfolio_volatilities))
     plt.figure(figsize=figsize)
+    plt.plot(portfolio_volatilities, returns, c='black', label='Constrained Efficient Frontier')
     plt.scatter(portfolio_volatilities[max_sharpe_ratio_index],
                 returns[max_sharpe_ratio_index],
                 marker='*',

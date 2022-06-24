@@ -215,26 +215,31 @@ def compute_ticker_vols(tickers, covariance_matrix):
     return ticker_stds
 
 
-def eff_frontier_plot(covariance_matrix, exp_returns, results, figsize=(12, 6)):
+def eff_frontier_plot(cov_matrix, exp_returns, results, figsize=(12, 6)):
     """
     Plots the efficient frontier and individual assets.
 
-    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
+    :param cov_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
                                       otherwise optimization will fail.
     :param exp_returns: (pd.Series) Expected returns for each asset.
     :param results: (pd.DataFrame) Risk, return, and sharpe ratio for all efficient frontier portfolios. Input the
                                    results DataFrame computed using the optimize_portfolio() function.
     :param figsize: (float, float) Optional, multiple by which to multiply the maximum weighting constraints at the
                                    ticker level. Defaults to (12, 6).
+    :param save: (bool) Optional, width, height in inches. Defaults to False.
+    :param show: (bool) Optional, displays plot. Defaults to True.
     :return: (fig) Plot of efficient frontier and individual assets.
     """
+    ticker_vols = compute_ticker_vols(cov_matrix.index, cov_matrix)
     portfolio_volatilities = list(results.iloc[1:2, :].squeeze())
     returns = list(results.iloc[:1, :].squeeze())
     sharpe_ratios = list(results.iloc[2:3, :].squeeze())
+    ticker_volatilities = list(ticker_vols.values)
     max_sharpe_ratio_index = sharpe_ratios.index(max(sharpe_ratios))
     min_volatility_index = portfolio_volatilities.index(min(portfolio_volatilities))
+    scatter_plot_index = ticker_volatilities.index(min(ticker_volatilities))
     plt.figure(figsize=figsize)
-    plt.plot(portfolio_volatilities, returns, c='black', label='Constrained Efficient Frontier')
+    figure = plt.plot(portfolio_volatilities, returns, c='black', label='Constrained Efficient Frontier')
     plt.scatter(portfolio_volatilities[max_sharpe_ratio_index],
                 returns[max_sharpe_ratio_index],
                 marker='*',
@@ -247,7 +252,7 @@ def eff_frontier_plot(covariance_matrix, exp_returns, results, figsize=(12, 6)):
                 color='r',
                 s=400,
                 label='Minimum Volatility')
-    plt.scatter(np.sqrt(np.diag(covariance_matrix)),
+    plt.scatter(np.sqrt(np.diag(cov_matrix)),
                 exp_returns,
                 marker='.',
                 color='black',
@@ -256,7 +261,7 @@ def eff_frontier_plot(covariance_matrix, exp_returns, results, figsize=(12, 6)):
     plt.title('Efficient Frontier with Individual Assets')
     plt.xlabel('Expected Volatility')
     plt.ylabel('Expected Return')
-    plt.legend()
+    plt.legend(loc='upper left')
 
 
 class OrderedWeights(bt.Algo):

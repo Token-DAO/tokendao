@@ -14,15 +14,14 @@ from pypfopt import efficient_frontier, objective_functions
 
 def price_history(tickers, period='max', column='Adj Close', start_date=None, slicing_method='dropna_rows'):
     """
-    Helper method to clean the raw weights, setting any weights whose absolute
-    values are below the cutoff to zero, and rounding the rest.
+    Downloads historical price data including Open, High, Close, Adj Close, or Volume.
 
-    :param tickers: (list) list of tickers.
-    :type period: (str) optional, valid options are 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max.
-    :param column: optional, valid options are Open, High, Close, Adj Close, or Volume.
-    :param start_date: optional, start date if slicing method is 'start_date'. Format 'YYYY-MM-DD'.
-    :param slicing_method: optional, splices DataFrame response. Valid options are dropna_rows, dropna_cols, and start_date.
-    :return: (pd.DataFrame) DataFrame of cleaned weights.
+    :param tickers: (list) List of tickers.
+    :type period: (str) Optional, valid options are 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max.
+    :param column: Optional, valid options are Open, High, Close, Adj Close, or Volume.
+    :param start_date: Optional, start date if slicing method is 'start_date'. Format 'YYYY-MM-DD'.
+    :param slicing_method: Optional, splices DataFrame response. Valid options are dropna_rows, dropna_cols, and start_date.
+    :return: (pd.DataFrame) DataFrame of historical prices.
     """
     resp = yf.download(tickers, period=period)[column]
     if slicing_method is None or slicing_method == 'None':
@@ -42,6 +41,12 @@ def price_history(tickers, period='max', column='Adj Close', start_date=None, sl
 
 
 def get_info(tickers):
+    """
+    Downloads ticker info.
+
+    :param tickers: (list) List of tickers.
+    :return: (pd.DataFrame) DataFrame of ticker info.
+    """
     yf_tickers = yf.Tickers(tickers)
     info_dict = {}
     for ticker in tqdm(tickers):
@@ -50,6 +55,12 @@ def get_info(tickers):
 
 
 def constraints_model(prices):
+    """
+    Downloads historical price data including Open, High, Close, Adj Close, or Volume.
+
+    :param prices: (pd.DataFrame) DataFrame of historical prices.
+    :return: (list of tuples) List of (minimum, maximum) weighting constraints.
+    """
     returns = prices.pct_change().dropna()
     volatility = returns.std() * 252 ** 0.5
     volatility_rank = pd.DataFrame(volatility.rank(pct=True, ascending=False), columns=['Volatility_Rank'])
@@ -75,8 +86,8 @@ def clean_weights(weights, cutoff=0.0001, rounding=4):
     values are below the cutoff to zero, and rounding the rest.
 
     :param weights: (pd.DataFrame) DataFrame of weightings.
-    :type cutoff: float, optional
-    :param rounding: number of decimal places to round the weights, defaults to 5.
+    :type cutoff: (float) Optional, cutoff level to clean weights.
+    :param rounding: Number of decimal places to round the weights, defaults to 4.
                      Set to None if rounding is not desired.
     :return: (pd.DataFrame) DataFrame of cleaned weights.
     """
@@ -98,6 +109,28 @@ def optimize_portfolio(
         target_return=0.10, risk_free_rate=0.02, market_neutral=False,
         risk_aversion=1
 ):
+    """
+    Compute the optimal portfolio.
+
+    :param expected_returns: (pd.Series) Expected returns for each asset.
+    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
+                                      otherwise optimization will fail.
+    :param objective: (str) Objective function used in the portfolio optimization. Defaults to 'max_sharpe'.
+    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible weights.
+    :type cutoff: (float) Optional, cutoff level to clean weights.
+    :param target_volatility: (float) Optional, the desired maximum volatility of the resulting portfolio. Required if
+                                      objective function is 'efficient_risk', otherwise, parameter is ignored. Defaults
+                                      to 0.01.
+    :param target_return: (float) Optional, the desired return of the resulting portfolio. Required if objective
+                                  function is 'efficient return', otherwise, parameter is ignored. Defaults to 0.2.
+    :param risk_free_rate: (float) Optional, annualized risk-free rate, defaults to 0.02. Required if objective function
+                                   is 'max_sharpe', otherwise, parameter is ignored.
+    :param market_neutral: (bool) Optional, if weights are allowed to be negative (i.e. short). Defaults to False.
+    :param risk_aversion: (positive float) Optional, risk aversion parameter (must be greater than 0). Required if
+                                           objective function is 'max_quadratic_utility'. Defaults to 1.
+    :return: (tuple) Tuple of weightings (pd.DataFrame) and results (pd.DataFrame) showing risk, return, sharpe ratio
+                     metrics.
+    """
     weightings = pd.DataFrame()
     results = pd.DataFrame()
     ef = efficient_frontier.EfficientFrontier(expected_returns, covariance_matrix, bounds)
@@ -130,6 +163,19 @@ def min_risk(
         expected_returns, covariance_matrix, bounds=(0, 1),
         gamma=0.1, cutoff=0.0001, risk_free_rate=0.02
 ):
+    """
+    Compute the minimum risk level.
+
+    :param expected_returns: (pd.Series) Expected returns for each asset.
+    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
+                                      otherwise optimization will fail.
+    :param bounds: (list of tuples) List of (minimum, maximum) weighting constraints.
+    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible weights.
+    :type cutoff: (float) Optional, cutoff level to clean weights.
+    :param risk_free_rate: (float) Optional, annualized risk-free rate, defaults to 0.02. Required if objective function
+                                   is 'max_sharpe', otherwise, parameter is ignored.
+    :return: (float) Volatility of the minimum risk portfolio.
+    """
     return optimize_portfolio(
         expected_returns, covariance_matrix, bounds, objective='min_volatility',
         gamma=gamma, cutoff=cutoff, risk_free_rate=risk_free_rate
@@ -140,6 +186,19 @@ def max_risk(
         expected_returns, covariance_matrix, bounds=(0, 1), target_volatility=2.0,
         gamma=0.1, cutoff=0.0001, risk_free_rate=0.02
 ):
+    """
+    Compute the maximum risk level.
+
+    :param expected_returns: (pd.Series) Expected returns for each asset.
+    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
+                                      otherwise optimization will fail.
+    :param bounds: (list of tuples) List of (minimum, maximum) weighting constraints.
+    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible weights.
+    :type cutoff: (float) Optional, cutoff level to clean weights.
+    :param risk_free_rate: (float) Optional, annualized risk-free rate, defaults to 0.02. Required if objective function
+                                   is 'max_sharpe', otherwise, parameter is ignored.
+    :return: (float) Volatility of the maximum risk portfolio.
+    """
     return optimize_portfolio(
         expected_returns, covariance_matrix, bounds, objective='efficient_risk',
         target_volatility=target_volatility, gamma=gamma, cutoff=cutoff,
@@ -151,17 +210,30 @@ def compute_efficient_frontier(
         expected_returns, covariance_matrix, bounds=(0, 1),
         gamma=0.1, cutoff=0.0001, risk_free_rate=0.02
 ):
+    """
+    Compute the efficient frontier portfolios and results.
+
+    :param expected_returns: (pd.Series) Expected returns for each asset.
+    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
+                                      otherwise optimization will fail.
+    :param bounds: (list of tuples) List of (minimum, maximum) weighting constraints.
+    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible weights.
+    :type cutoff: (float) Optional, cutoff level to clean weights.
+    :param risk_free_rate: (float) Optional, annualized risk-free rate, defaults to 0.02. Required if objective function
+                                   is 'max_sharpe', otherwise, parameter is ignored.
+    :return: (tuple) Tuple of DataFrames containing portfolio weightings and results of efficient frontier portfolios.
+    """
     old_stdout = sys.stdout  # backup current stdout
     sys.stdout = open(os.devnull, "w")
-    min_volatility = min_risk(expected_returns, covariance_matrix, bounds)
-    max_volatility = max_risk(expected_returns, covariance_matrix, bounds)
+    min_volatility = min_risk(expected_returns, covariance_matrix, bounds, gamma, cutoff, risk_free_rate)
+    max_volatility = max_risk(expected_returns, covariance_matrix, bounds, gamma, cutoff, risk_free_rate)
     optimized_portfolios = pd.DataFrame()
     results = pd.DataFrame()
     counter = 1
     for i in tqdm(np.linspace(min_volatility + .001, max_volatility, 20).round(4)):
         optimized_portfolio, optimized_performance = optimize_portfolio(
             expected_returns, covariance_matrix, bounds, objective='efficient_risk',
-            gamma=gamma, cutoff=cutoff, target_volatility=i
+            gamma=gamma, cutoff=cutoff, target_volatility=i, risk_free_rate=risk_free_rate
         )
         portfolio = optimized_portfolio[int(1)]
         portfolio.name = counter
@@ -214,22 +286,20 @@ def compute_ticker_vols(tickers, covariance_matrix):
     return ticker_stds
 
 
-def eff_frontier_plot(cov_matrix, exp_returns, results, figsize=(12, 6)):
+def eff_frontier_plot(covariance_matrix, expected_returns, results, figsize=(12, 6)):
     """
     Plots the efficient frontier and individual assets.
 
-    :param cov_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
+    :param covariance_matrix: (pd.DataFrame) covariance of returns for each asset. This **must** be positive semidefinite,
                                       otherwise optimization will fail.
-    :param exp_returns: (pd.Series) Expected returns for each asset.
-    :param results: (pd.DataFrame) Risk, return, and sharpe ratio for all efficient frontier portfolios. Input the
-                                   results DataFrame computed using the optimize_portfolio() function.
-    :param figsize: (float, float) Optional, multiple by which to multiply the maximum weighting constraints at the
+    :param expected_returns: (pd.Series) expected returns for each asset.
+    :param results: (pd.DataFrame) risk, return, and sharpe ratio for all efficient frontier portfolios. Input the
+                                   results DataFrame computed using the compute_efficient_frontier() function.
+    :param figsize: (float, float) optional, multiple by which to multiply the maximum weighting constraints at the
                                    ticker level. Defaults to (12, 6).
-    :param save: (bool) Optional, width, height in inches. Defaults to False.
-    :param show: (bool) Optional, displays plot. Defaults to True.
-    :return: (fig) Plot of efficient frontier and individual assets.
+    :return: (fig) plot of efficient frontier and individual assets.
     """
-    ticker_vols = compute_ticker_vols(cov_matrix.index, cov_matrix)
+    ticker_vols = compute_ticker_vols(covariance_matrix.index, covariance_matrix)
     portfolio_volatilities = list(results.iloc[1:2, :].squeeze())
     returns = list(results.iloc[:1, :].squeeze())
     sharpe_ratios = list(results.iloc[2:3, :].squeeze())
@@ -251,8 +321,8 @@ def eff_frontier_plot(cov_matrix, exp_returns, results, figsize=(12, 6)):
                 color='r',
                 s=400,
                 label='Minimum Volatility')
-    plt.scatter(np.sqrt(np.diag(cov_matrix)),
-                exp_returns,
+    plt.scatter(np.sqrt(np.diag(covariance_matrix)),
+                expected_returns,
                 marker='.',
                 color='black',
                 s=100,
@@ -273,6 +343,18 @@ class OrderedWeights(bt.Algo):
 
 
 def rebalance_module(rebalance_freq='once', tolerance=0.2):
+    """
+    Plots the efficient frontier and individual assets.
+
+    :param rebalance_freq: (str) Desired frequency of rebalancing back to target weights. Options are 'once', 'daily',
+                                 'weekly', 'monthly', 'quarterly', 'yearly', or 'outofbounds'. 'Once' implies a buy and
+                                 hold portfolio. 'outofbounds' rebalances the portfolio if portfolio weightings deviate
+                                 more than the tolerance allowed away from the target weightings.
+    :param tolerance: (float) Allowed deviation of each security weight. If a security has a 10% target weight, then
+                              setting tolerance to 0.2 means the strategy would rebalance once the security weight surpassed
+                              8% or 12%.
+    :return: (obj) Object containing rebalancing criteria implemented in backtests.
+    """
     if rebalance_freq == 'once':
         return bt.algos.RunOnce()
     elif rebalance_freq == 'weekly':

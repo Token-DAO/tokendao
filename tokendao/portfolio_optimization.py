@@ -170,7 +170,6 @@ def compute_efficient_frontier(
         result.columns = [counter]
         results = pd.concat([results, result], axis=1)
         counter += 1
-    results.index.name = 'efficient_frontier'
     optimized_portfolios = optimized_portfolios.fillna(0)
     sys.stdout = old_stdout  # reset old stdout
     return optimized_portfolios, results

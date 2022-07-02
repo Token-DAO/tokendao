@@ -48,7 +48,7 @@ def download():
         filename = filenames[
             filenames['filenames'] == '/coinmetrics/data/blob/master/csv/{}.csv'.format(ticker)].squeeze()
         csv = pd.read_csv('https://github.com' + filename + '?raw=true')
-        csv.to_csv('content/drive/MyDrive/GitHub/tokendao/data/coinmetrics/{}.csv'.format(ticker))
+        csv.to_csv('/content/drive/MyDrive/GitHub/tokendao/data/coinmetrics/{}.csv'.format(ticker))
 
 
 def check_tickers(search_term, tickers, show=False):

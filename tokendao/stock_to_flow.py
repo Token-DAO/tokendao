@@ -27,11 +27,8 @@ def timeseries(ticker, fields):
     :param fields: (str or list of str) Data fields for which to include in timeseries DataFrame.
     :returns: (pd.DateFrame or pd.Series) DataFrame or Series (if only one field) containing requested data.
     """
-    try:
-        df = pd.read_csv('../data/coinmetrics/{}.csv'.format(ticker)).iloc[:, 1:].set_index('time', drop=True)
-    except FileNotFoundError:
-        filename = '/coinmetrics/data/blob/master/csv/{}.csv'.format(ticker)
-        df = pd.read_csv('https://github.com' + filename + '?raw=true').set_index('time', drop=True)
+    filename = '/coinmetrics/data/blob/master/csv/{}.csv'.format(ticker)
+    df = pd.read_csv('https://github.com' + filename + '?raw=true').set_index('time', drop=True)
     df.index = pd.to_datetime(df.index)
     return df[fields].dropna()
 

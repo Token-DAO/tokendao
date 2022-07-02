@@ -51,12 +51,11 @@ def download():
         csv.to_csv('../data/coinmetrics/{}.csv'.format(ticker))
 
 
-def check_tickers(search_term, filenames, tickers, show=False):
+def check_tickers(search_term, tickers, show=False):
     """
     Helper function to filter out tickers which have no available data based on the search term parameter.
 
     :param search_term: (str) Search term to look for in all ticker datasets. Type only one search term.
-    :param filenames: (pd.DataFrame) DataFrame of filenames where csv files are located.
     :param tickers: (list of str) List of tickers to filter through.
     :param show: (bool) Optional, prints tickers which have data available.
     :returns: (list) List of tickers which have data available.

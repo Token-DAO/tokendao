@@ -78,6 +78,7 @@ def stock_to_flow_model(ticker, p0=None, show=False):
     roll_max = np.maximum.accumulate(drawdown)
     drawdown = drawdown / roll_max - 1.
     df['ModelCapMrktCurUSD'] = (np.exp(params[0]) * (df['StocktoFlow'] ** params[1])).round(4)
+    df['ModelPriceUSD'] = df['ModelCapMrktCurUSD'] / df['SplyCur']
     df['Difference%'] = df['ModelCapMrktCurUSD'] / df['CapMrktCurUSD'] - 1
     df['MaxDrawdown%'] = drawdown.round(4)
     df.insert(2, 'BlkCntMonthly', df['TotalBlks'] - df['TotalBlks'].shift(30))
@@ -123,36 +124,6 @@ def stock_to_flow_model(ticker, p0=None, show=False):
             '[2] Conclusion could be the result of spurious correlation. Test for cointegration to confirm. Use with '
             'caution.')
     return df, params
-
-
-def clean_tickers(p0=None):
-    """
-    Display tickers for which data is available for a stock-to-flow model and for which no Error or RuntimeWarning are
-    thrown. Refer to https://docs.coinmetrics.io/asset-metrics/network-usage/blkcnt and
-    https://docs.coinmetrics.io/asset-metrics/supply/splycur for more information on the required inputs. The method
-    below searches all ticker data specifically for 'blkcnt' and 'splycur' and removes tickers which have no data.
-    Finally, the method also tries to fit a power law model to the data and filters out tickers whose data causes the
-    parameter optimization algorithm to throw a RuntimeWarning. Tickers which have data but throws a RuntimeWarning may
-    contain data which cannot be properly fitted to a power law curve for whatever reasons, one of which is not having
-    a large enough sample size.
-
-    :param p0: (list of [float,float]) Optional, initial guesses for coefficients a and b in the objective function.
-                                       Defaults to None.
-    :returns: (list) List of tickers which have data available and do not produce a RuntimeWarning.
-    """
-    warnings.filterwarnings('error')
-    filenames, tickers = coinmetrics_urls()
-    tickers = check_tickers('BlkCnt', filenames, tickers)  # Search Term 1
-    tickers = check_tickers('SplyCur', filenames, tickers)  # Search Term 2
-    filtered_tickers = []
-    for ticker in tqdm(tickers):
-        try:
-            filtered_tickers.append(ticker)
-        except (AttributeError, ValueError, RuntimeWarning):
-            continue
-    print('Tickers which ran without raising an Error or RuntimeWarning: {}'.format(filtered_tickers))
-    print('Number of Tickers: {}'.format(len(filtered_tickers)))
-    return filtered_tickers
 
 
 def regression_analysis(df, show=False, cov_type='HAC'):

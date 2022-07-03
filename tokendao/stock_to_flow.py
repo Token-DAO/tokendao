@@ -1,13 +1,11 @@
-import re
-import requests
-import warnings
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 import statsmodels.stats.api as sms
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from datetime import datetime
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from statsmodels.compat import lzip
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.tsa.stattools import adfuller, coint
@@ -65,9 +63,9 @@ def stock_to_flow_model(ticker, p0=None, show=False):
                                 to None.
     :param show: (bool) Optional, prints the results from fitting a power law function to the stock-to-flow data.
                         Defaults to False.
-    :returns: (pd.DataFrame, np.array) DataFrame containing data necessary to compute stock-to-flow model
-                                                  along with a np.array containing the fitted values for coefficients
-                                                  a and b in the objective function.
+    :returns: (pd.DataFrame, np.array) DataFrame containing data necessary to compute stock-to-flow model along with a
+                                       np.array containing the fitted values for coefficients a and b in the objective
+                                       function.
     """
     df = stock_to_flow_data(ticker)
     xdata = df.StocktoFlow.values
@@ -215,8 +213,9 @@ def markdown_model(params):
     """
     Helper function to display specified regression model in markdown format.
 
-    :param params: (list of [float, float]) Ticker of cryptocurrency.
-    :returns: (markdown text) Generates log scale pyplot.
+    :param params: (list of [float, float]) Parameters of stock-to-flow model computed using stock_to_flow_model
+                                            function.
+    :returns: (markdown text) Generates markdown text containing the computed stock-to-flow model.
     """
     a, b = params[0].round(3), params[1].round(3)
     print('Power Law Model:')
@@ -505,3 +504,96 @@ def charts(df, ticker, params, chart=1, figsize=(12, 6), save=False, show=True):
     if save: plt.savefig(
         '../charts/chart{}_{}.png'.format(chart, datetime.today().strftime('%m-%d-%Y')), bbox_inches='tight')
     if not show: plt.close()
+
+
+def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined):
+    """
+    Forecasts the future expected price based on the computed stock-to-flow model.
+
+    :param df: (pd.DataFrame) DataFrame containing data necessary to compute stock-to-flow model.
+    :param params: (list of [float, float]) Parameters of stock-to-flow model computed using stock_to_flow_model
+                                            function.
+    :param halvening_dates: (list) List of halvening dates. Date format is 'YYYY-MM-DD'.
+    :param daily_average_mined: (list of [float,float]) Ticker of cryptocurrency.
+    :param daily_std_mined: (int) Select one of 3 pre-formatted charts labeled 1, 2 and 3. Defaults to 1.
+    :returns: (tuple of pd.DataFrame) Generates tuple of dataframes containing forecasted data and historical sample
+                                      stock-to-flow data.
+    """
+    past_df = df.copy()[['SplyCur']]
+    past_df['SplyCurDiffDaily'] = past_df['SplyCur'].diff()
+    past_df['SplyCurDiffAnnual'] = past_df['SplyCur'].diff(365)
+
+    dfs = {'past': past_df}
+    for halvening_date, i in tqdm(zip(halvening_dates, range(0, len(halvening_dates)))):
+        days_until = (pd.to_datetime(halvening_date, format='%Y-%m-%d') - pd.to_datetime(
+            dfs[list(dfs.keys())[-1]].index[-1])).days
+        future_df = pd.DataFrame(
+            index=pd.date_range(pd.to_datetime(dfs[list(dfs.keys())[-1]].index[-1] + timedelta(days=1)),
+                                periods=days_until))
+        if i == 0:
+            divisor = 1
+        else:
+            divisor = 2
+        daily_average_mined = daily_average_mined / divisor
+        daily_std_mined = daily_std_mined / divisor
+        future_df['SplyCurDiffDaily'] = np.random.normal(daily_average_mined, daily_std_mined, days_until).round(2)
+        splycur = [dfs[list(dfs.keys())[-1]]['SplyCur'][-1]]
+        [splycur.append((splycur[-1] + sply).round(2)) for sply in future_df.SplyCurDiffDaily.values]
+        future_df['SplyCur'] = splycur[1:]
+        future_df = future_df[['SplyCur', 'SplyCurDiffDaily']]
+        future_df = pd.concat([dfs[list(dfs.keys())[-1]], future_df])
+        future_df['StocktoFlowAnnual'] = round(
+            future_df['SplyCur'] / (future_df['SplyCur'] - future_df['SplyCur'].shift(365)), 2)
+        dfs[halvening_date] = future_df
+    full_df = dfs[list(dfs.keys())[-1]]
+    full_df['SplyCurDiffAnnual'] = (full_df['SplyCur'] - full_df['SplyCur'].shift(365))
+    full_df['ModelCapMrktCurUSD'] = (np.exp(params[0]) * (full_df['StocktoFlowAnnual'] ** params[1])).round(4)
+    full_df['ModelPriceUSD'] = (full_df['ModelCapMrktCurUSD'] / full_df['SplyCur']).round(2)
+    full_df = full_df.dropna()
+    sample_df = df.loc[full_df.index[0]:]
+    return full_df, sample_df
+
+
+def forecast_chart(sample_df, full_df, params):
+    """
+    Forecasts the future expected price based on the computed stock-to-flow model.
+
+    :param sample_df: (pd.DataFrame) DataFrame containing historical sample stock-to-flow data.
+    :param full_df: (pd.DataFrame) DataFrame containing forecasted stock-to-flow data.
+    :param params: (list) Parameters of stock-to-flow model computed using stock_to_flow_model function.
+    :returns: (plot) Generates a plot showing stock-to-flow model forecast versus historical data.
+    """
+    plot_df = pd.DataFrame({'PriceUSD': sample_df.PriceUSD, 'ModelPriceUSD': full_df.ModelPriceUSD})
+    plt.figure(figsize=(12, 6))
+    plt.yscale('log')
+    plt.title("PriceUSD versus ModelPriceUSD ({})\n {} to {}".format(
+        'BTC-USD',
+        full_df.index[0].strftime('%m-%d-%Y'),
+        full_df.index[-1].strftime('%m-%d-%Y')))
+    plt.xlabel('Year')
+    plt.ylabel('PriceUSD ({})'.format('BTC-USD'))
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(lambda ytrue, _: '{:,.16g}'.format(ytrue)))
+    plt.plot(plot_df.PriceUSD, 'b')
+    plt.plot(plot_df.ModelPriceUSD, 'r')
+    plt.legend(['PriceUSD ({})'.format('BTC-USD'), 'ModelPriceUSD: e^{:.3f} * SF^{:.3f}'.format(*params)])
+    plt.show();
+
+
+def selected_forecast(full_df):
+    """
+    Displays current and annual price forecasts based on computed stock-to-flow model.
+
+    :param full_df: (pd.DataFrame) DataFrame containing forecasted stock-to-flow data.
+    :returns: (print) Prints current and annual price forecasts based on computed stock-to-flow model.
+    """
+    selected_future_dates = [datetime.today().strftime('%Y-%m-%d'),
+                             datetime(datetime.today().year, 12, 31).strftime('%Y-%m-%d')]
+    for i in range(0, relativedelta(full_df.index[-1], datetime.today()).years):
+        selected_future_dates.append(datetime(datetime.today().year + i + 1, 12, 31).strftime('%Y-%m-%d'))
+    try:
+        select_df = full_df.loc[selected_future_dates]
+    except KeyError:
+        select_df = full_df.loc[selected_future_dates[:-1]]
+    print('Forecasted BTC-USD Price:\n')
+    for i in range(0, len(select_df.index)):
+        print(select_df.index[i].strftime('%Y-%m-%d') + ': {}'.format('${:,.0f}'.format(select_df.ModelPriceUSD[i])))

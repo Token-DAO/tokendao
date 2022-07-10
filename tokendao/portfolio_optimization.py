@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from tqdm import tqdm
-from pypfopt import efficient_frontier, objective_functions
+from pypfopt import black_litterman, risk_models, efficient_frontier, objective_functions
 
 
 def price_history(tickers, period='max', column='Adj Close', start_date=None, slicing_method='dropna_rows'):
@@ -52,6 +52,20 @@ def get_info(tickers):
     for ticker in tqdm(tickers):
         info_dict[ticker] = yf_tickers.tickers[ticker].info
     return pd.DataFrame.from_dict(info_dict).T.sort_index(axis=1)
+
+
+def returns_model(info, prices, covariance_matrix):
+    """
+    Computes expected returns using Black-Litterman model.
+
+    :param info: (pd.DataFrame) DataFrame of ticker info.
+    :param prices: (pd.DataFrame) DataFrame of historical prices.
+    :param covariance_matrix: (pd.DataFrame) DataFrame containing risk model covariance matrix.
+    :return: (pd.Series) Series of expected returns for each ticker.
+    """
+    market_caps = info['marketCap'].astype(float)
+    risk_aversion = black_litterman.market_implied_risk_aversion(prices, frequency=365)
+    return black_litterman.market_implied_prior_returns(market_caps, risk_aversion, covariance_matrix)
 
 
 def constraints_model(prices):

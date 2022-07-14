@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from tqdm import tqdm
-from pypfopt import efficient_frontier, objective_functions
+from pypfopt import black_litterman, risk_models, efficient_frontier, objective_functions
 
 
 def price_history(tickers, period='max', column='Adj Close', start_date=None, slicing_method='dropna_rows'):
@@ -52,6 +52,20 @@ def get_info(tickers):
     for ticker in tqdm(tickers):
         info_dict[ticker] = yf_tickers.tickers[ticker].info
     return pd.DataFrame.from_dict(info_dict).T.sort_index(axis=1)
+
+
+def returns_model(info, prices, covariance_matrix):
+    """
+    Computes expected returns using Black-Litterman model.
+
+    :param info: (pd.DataFrame) DataFrame of ticker info.
+    :param prices: (pd.DataFrame) DataFrame of historical prices.
+    :param covariance_matrix: (pd.DataFrame) DataFrame containing risk model covariance matrix.
+    :return: (pd.Series) Series of expected returns for each ticker.
+    """
+    market_caps = info['marketCap'].astype(float)
+    risk_aversion = black_litterman.market_implied_risk_aversion(prices, frequency=365)
+    return black_litterman.market_implied_prior_returns(market_caps, risk_aversion, covariance_matrix)
 
 
 def constraints_model(prices):
@@ -113,10 +127,12 @@ def optimize_portfolio(
     Compute the optimal portfolio.
 
     :param expected_returns: (pd.Series) Expected returns for each asset.
-    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
-                                      otherwise optimization will fail.
+    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive
+                                             semidefinite, otherwise optimization will fail.
+    :param bounds: (list of tuples) List of (minimum, maximum) weighting constraints.
     :param objective: (str) Objective function used in the portfolio optimization. Defaults to 'max_sharpe'.
-    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible weights.
+    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible
+                          weights.
     :type cutoff: (float) Optional, cutoff level to clean weights.
     :param target_volatility: (float) Optional, the desired maximum volatility of the resulting portfolio. Required if
                                       objective function is 'efficient_risk', otherwise, parameter is ignored. Defaults
@@ -190,10 +206,12 @@ def max_risk(
     Compute the maximum risk level.
 
     :param expected_returns: (pd.Series) Expected returns for each asset.
-    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive semidefinite,
-                                      otherwise optimization will fail.
+    :param covariance_matrix: (pd.DataFrame) Covariance of returns for each asset. This **must** be positive
+                                             semidefinite, otherwise optimization will fail.
     :param bounds: (list of tuples) List of (minimum, maximum) weighting constraints.
-    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible weights.
+    :param target_volatility: (float or int) Optional, sets portfolio volatility % to this level.
+    :param gamma: (float) Optional, L2 regularisation parameter, defaults to 0. Increase if you want more non-negligible
+                          weights.
     :type cutoff: (float) Optional, cutoff level to clean weights.
     :param risk_free_rate: (float) Optional, annualized risk-free rate, defaults to 0.02. Required if objective function
                                    is 'max_sharpe', otherwise, parameter is ignored.
@@ -255,13 +273,13 @@ def risk_weightings(optimized_portfolios, covariance_matrix):
     :return: (pd.DataFrame) Risk-weightings for efficient frontier portfolios.
     """
     cash_weightings = optimized_portfolios.copy()
-    risk_weightings = pd.DataFrame(index=cash_weightings.index)
+    df = pd.DataFrame(index=cash_weightings.index)
     for i in range(1, cash_weightings.shape[1] + 1):
         w = cash_weightings[i]
         pvar = np.dot(w.T, np.dot(covariance_matrix, w))
         pvolw = ((np.dot(w, covariance_matrix)) / pvar) * w
-        risk_weightings = pd.concat([risk_weightings, pvolw], axis=1)
-    return risk_weightings
+        df = pd.concat([df, pvolw], axis=1)
+    return df
 
 
 def compute_ticker_vols(tickers, covariance_matrix):
@@ -282,8 +300,7 @@ def compute_ticker_vols(tickers, covariance_matrix):
         except IndexError:
             break
         count += 1
-    ticker_stds = pd.Series(ticker_stds, tickers)
-    return ticker_stds
+    return pd.Series(ticker_stds, tickers)
 
 
 def eff_frontier_plot(covariance_matrix, expected_returns, results, figsize=(12, 6)):
@@ -299,16 +316,13 @@ def eff_frontier_plot(covariance_matrix, expected_returns, results, figsize=(12,
                                    ticker level. Defaults to (12, 6).
     :return: (fig) plot of efficient frontier and individual assets.
     """
-    ticker_vols = compute_ticker_vols(covariance_matrix.index, covariance_matrix)
     portfolio_volatilities = list(results.iloc[1:2, :].squeeze())
     returns = list(results.iloc[:1, :].squeeze())
     sharpe_ratios = list(results.iloc[2:3, :].squeeze())
-    ticker_volatilities = list(ticker_vols.values)
     max_sharpe_ratio_index = sharpe_ratios.index(max(sharpe_ratios))
     min_volatility_index = portfolio_volatilities.index(min(portfolio_volatilities))
-    scatter_plot_index = ticker_volatilities.index(min(ticker_volatilities))
     plt.figure(figsize=figsize)
-    figure = plt.plot(portfolio_volatilities, returns, c='black', label='Constrained Efficient Frontier')
+    plt.plot(portfolio_volatilities, returns, c='black', label='Constrained Efficient Frontier')
     plt.scatter(portfolio_volatilities[max_sharpe_ratio_index],
                 returns[max_sharpe_ratio_index],
                 marker='*',
@@ -331,6 +345,7 @@ def eff_frontier_plot(covariance_matrix, expected_returns, results, figsize=(12,
     plt.xlabel('Expected Volatility')
     plt.ylabel('Expected Return')
     plt.legend(loc='upper left')
+    plt.show()
 
 
 class OrderedWeights(bt.Algo):

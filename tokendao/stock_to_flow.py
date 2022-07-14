@@ -17,14 +17,16 @@ from scipy.optimize import curve_fit
 from scipy import stats
 
 
-def timeseries(ticker, fields):
+def timeseries(ticker, fields=None):
     """
     Helper function to filter out tickers which have no available data based on the search term parameter.
 
     :param ticker: (str) Ticker of cryptocurrency you want to look up.
-    :param fields: (str or list of str) Data fields for which to include in timeseries DataFrame.
+    :param fields: (str or list of str) Optional, data fields for which to include in timeseries DataFrame.
     :returns: (pd.DateFrame or pd.Series) DataFrame or Series (if only one field) containing requested data.
     """
+    if fields is None:
+        fields = ['PriceUSD']
     filename = '/coinmetrics/data/blob/master/csv/{}.csv'.format(ticker)
     df = pd.read_csv('https://github.com' + filename + '?raw=true').set_index('time', drop=True)
     df.index = pd.to_datetime(df.index)
@@ -139,8 +141,8 @@ def regression_analysis(df, show=False, cov_type='HAC'):
                            https://www.statsmodels.org/devel/generated/statsmodels.stats.sandwich_covariance.cov_hac.html#statsmodels.stats.sandwich_covariance.cov_hac
                            for more information.
     :returns: (obj) Results instance with the requested robust covariance as the default
-                   covariance of the parameters. Inferential statistics like p-values and hypothesis tests will be based
-                   on this covariance matrix.
+                    covariance of the parameters. Inferential statistics like p-values and hypothesis tests will be
+                    based on this covariance matrix.
     """
     x = df['ModelCapMrktCurUSD']
     y = df['CapMrktCurUSD']
@@ -499,11 +501,41 @@ def charts(df, ticker, params, chart=1, figsize=(12, 6), save=False, show=True):
             df.index[-1].strftime('%m-%d-%Y')))
         plt.xlabel('Stock-to-Flow ({})'.format(ticker))
         plt.ylabel('CapMrktCurUSD ({})'.format(ticker))
+    elif chart == 4:
+        a1, b1 = 14.6, 3.3
+        a2, b2 = params[0], params[1]
+        drawdown = (df['MaxDrawdown%'] * 100).to_numpy()
+        ytrue = df['CapMrktCurUSD'].to_numpy()
+        ypred_planb, ypred_tokendao = np.exp(a1) * sf ** b1, np.exp(a2) * sf ** b2
+        plt.style.use('grayscale')
+        fig, ax = plt.subplots(figsize=(15, 7))
+        im = ax.scatter(sf, ytrue, c=drawdown, cmap=cm.jet, lw=1, alpha=1, zorder=5, label=ticker)
+        plt.xscale('log')
+        plt.yscale('log', subsy=[1])
+        ax.plot(sf, ypred_planb, c='black', label='Plan B Model: e^{:.3f} * SF^{:.3f}'.format(a1, b1))
+        ax.plot(sf, ypred_tokendao, c='red', label='tokendao Model: e^{:.3f} * SF^{:.3f}'.format(a2, b2))
+        ax.yaxis.set_major_formatter(ScalarFormatter())
+        ax.yaxis.set_minor_formatter(ScalarFormatter())
+        ax.xaxis.set_major_formatter(ScalarFormatter())
+        ax.xaxis.set_minor_formatter(ScalarFormatter())
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda ytrue, _: '{:,.16g}'.format(ytrue)))
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda sf, _: '{:,.16g}'.format(sf)))
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.ax.set_ylabel('Maximum Drawdown%')
+        plt.xlabel('Stock-to-Flow')
+        plt.ylabel('CapMrktCurUSD ({})'.format(ticker))
+        plt.title("Stock-to-Flow and CapMrktCurUSD ({})\n {} to {}".format(
+            ticker,
+            df.index[0].strftime('%m-%d-%Y'),
+            df.index[-1].strftime('%m-%d-%Y')))
+        plt.legend()
     else:
         raise ValueError('Invalid chart number. Type a valid number to the chart parameter.')
-    if save: plt.savefig(
-        '../charts/chart{}_{}.png'.format(chart, datetime.today().strftime('%m-%d-%Y')), bbox_inches='tight')
-    if not show: plt.close()
+    if save:
+        plt.savefig('../charts/chart{}_{}.png'.format(chart, datetime.today().strftime('%m-%d-%Y')),
+                    bbox_inches='tight')
+    if not show:
+        plt.close()
 
 
 def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined):
@@ -576,7 +608,7 @@ def forecast_chart(sample_df, full_df, params):
     plt.plot(plot_df.PriceUSD, 'b')
     plt.plot(plot_df.ModelPriceUSD, 'r')
     plt.legend(['PriceUSD ({})'.format('BTC-USD'), 'ModelPriceUSD: e^{:.3f} * SF^{:.3f}'.format(*params)])
-    plt.show();
+    plt.show()
 
 
 def selected_forecast(full_df):

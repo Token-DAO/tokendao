@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from pypfopt import risk_models
+
 
 ROOT_DIR = os.path.abspath(os.curdir)
 ROOT_DIR = ROOT_DIR.replace("\\", "/").replace("tests", "")
@@ -13,8 +13,12 @@ sys.path.insert(0, ROOT_DIR)
 from tokendao import stock_to_flow as sf
 
 ticker = "btc"
+halvening_dates = ['2024-04-02', '2028-06-01', '2032-06-01']
+daily_average_mined = 905.80  # currently pre-2024-04-02
+daily_std_mined = 105.82  # currently pre-2024-04-02
 df, params = sf.stock_to_flow_model(ticker)
 results = sf.regression_analysis(df)
+full_df, sample_df = sf.forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined)
 
 
 def test_timeseries():
@@ -98,30 +102,15 @@ def test_cointegration():
 
 
 def test_forecast():
-    halvening_dates = ['2024-04-02', '2028-06-01', '2032-06-01']
-    daily_average_mined = 905.80  # currently pre-2024-04-02
-    daily_std_mined = 105.82  # currently pre-2024-04-02
-    full_df, sample_df = sf.forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined)
-    try:
-        old_stdout = sys.stdout  # backup current stdout
-        sys.stdout = open(os.devnull, "w")
-        sf.forecast_chart(sample_df, full_df, params)
-        sys.stdout = old_stdout  # reset old stdout
-    except:
-        raise AssertionError("Exception raised.")
     assert isinstance(full_df, pd.DataFrame)
     assert isinstance(sample_df, pd.DataFrame)
-
-
-def test_charts():
-    sf.charts(df, ticker, params, chart=1, figsize=(16, 7))
 
 
 def test_selected_forecast():
     try:
         old_stdout = sys.stdout  # backup current stdout
         sys.stdout = open(os.devnull, "w")
-        sf.forecast_chart(sample_df, full_df, params_sf)
+        sf.selected_forecast(full_df)
         sys.stdout = old_stdout  # reset old stdout
     except:
         raise AssertionError("Exception raised.")
@@ -135,4 +124,10 @@ if __name__ == "__main__":
     test_model_significance()
     test_confidence_interval()
     test_breuschpagan()
+    test_durbinwatson()
+    test_shapiro()
+    test_adfuller()
+    test_cointegration()
+    test_forecast()
+    test_selected_forecast()
     print("Everything passed")

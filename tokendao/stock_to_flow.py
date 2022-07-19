@@ -586,36 +586,38 @@ def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined):
     return full_df, sample_df
 
 
-def forecast_chart(sample_df, full_df, params):
+def forecast_chart(sample_df, full_df, params, ticker):
     """
     Forecasts the future expected price based on the computed stock-to-flow model.
 
     :param sample_df: (pd.DataFrame) DataFrame containing historical sample stock-to-flow data.
     :param full_df: (pd.DataFrame) DataFrame containing forecasted stock-to-flow data.
     :param params: (list) Parameters of stock-to-flow model computed using stock_to_flow_model function.
+    :param ticker: (str) Ticker of cryptocurrency you want to look up.
     :returns: (plot) Generates a plot showing stock-to-flow model forecast versus historical data.
     """
     plot_df = pd.DataFrame({'PriceUSD': sample_df.PriceUSD, 'ModelPriceUSD': full_df.ModelPriceUSD})
     plt.figure(figsize=(12, 6))
     plt.yscale('log')
     plt.title("PriceUSD versus ModelPriceUSD ({})\n {} to {}".format(
-        'BTC-USD',
+        ticker.upper(),
         full_df.index[0].strftime('%m-%d-%Y'),
         full_df.index[-1].strftime('%m-%d-%Y')))
     plt.xlabel('Year')
-    plt.ylabel('PriceUSD ({})'.format('BTC-USD'))
+    plt.ylabel('PriceUSD ({})'.format(ticker.upper()))
     plt.gca().yaxis.set_major_formatter(FuncFormatter(lambda ytrue, _: '{:,.16g}'.format(ytrue)))
     plt.plot(plot_df.PriceUSD, 'b')
     plt.plot(plot_df.ModelPriceUSD, 'r')
-    plt.legend(['PriceUSD ({})'.format('BTC-USD'), 'ModelPriceUSD: e^{:.3f} * SF^{:.3f}'.format(*params)])
+    plt.legend(['PriceUSD ({})'.format(ticker.upper()), 'ModelPriceUSD: e^{:.3f} * SF^{:.3f}'.format(*params)])
     plt.show()
 
 
-def selected_forecast(full_df):
+def selected_forecast(full_df, ticker):
     """
     Displays current and annual price forecasts based on computed stock-to-flow model.
 
     :param full_df: (pd.DataFrame) DataFrame containing forecasted stock-to-flow data.
+    :param ticker: (str) Ticker of cryptocurrency you want to look up.
     :returns: (print) Prints current and annual price forecasts based on computed stock-to-flow model.
     """
     selected_future_dates = [datetime.today().strftime('%Y-%m-%d'),
@@ -626,6 +628,6 @@ def selected_forecast(full_df):
         select_df = full_df.loc[selected_future_dates]
     except KeyError:
         select_df = full_df.loc[selected_future_dates[:-1]]
-    print('Forecasted BTC-USD Price:\n')
+    print('Forecasted {} Price:\n'.format(ticker.upper()))
     for i in range(0, len(select_df.index)):
         print(select_df.index[i].strftime('%Y-%m-%d') + ': {}'.format('${:,.0f}'.format(select_df.ModelPriceUSD[i])))

@@ -538,7 +538,7 @@ def charts(df, ticker, params, chart=1, figsize=(12, 6), save=False, show=True):
         plt.close()
 
 
-def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined):
+def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined, divisor=None):
     """
     Forecasts the future expected price based on the computed stock-to-flow model.
 
@@ -548,6 +548,7 @@ def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined):
     :param halvening_dates: (list) List of halvening dates. Date format is 'YYYY-MM-DD'.
     :param daily_average_mined: (list of [float,float]) Ticker of cryptocurrency.
     :param daily_std_mined: (int) Select one of 3 pre-formatted charts labeled 1, 2 and 3. Defaults to 1.
+    :param divisor: (int) Divisor applied to block reward during halving events.
     :returns: (tuple of pd.DataFrame) Generates tuple of dataframes containing forecasted data and historical sample
                                       stock-to-flow data.
     """
@@ -565,7 +566,10 @@ def forecast(df, params, halvening_dates, daily_average_mined, daily_std_mined):
         if i == 0:
             divisor = 1
         else:
-            divisor = 2
+            if divisor is None:
+                divisor = 2
+            else:
+                pass
         daily_average_mined = daily_average_mined / divisor
         daily_std_mined = daily_std_mined / divisor
         future_df['SplyCurDiffDaily'] = np.random.normal(daily_average_mined, daily_std_mined, days_until).round(2)
